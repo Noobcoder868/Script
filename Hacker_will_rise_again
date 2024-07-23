@@ -1,0 +1,164 @@
+-- Services
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- LocalPlayer
+local client = Players.LocalPlayer
+local remote = ReplicatedStorage:WaitForChild("WeaponFrameworkRep"):WaitForChild("Events"):WaitForChild("Damage")
+
+-- Create ScreenGui
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "PlayerSelectionGui"
+screenGui.Parent = client:WaitForChild("PlayerGui")
+
+-- Create Frame
+local frame = Instance.new("Frame")
+frame.Name = "MainFrame"
+frame.Size = UDim2.new(0, 300, 0, 400)
+frame.Position = UDim2.new(1, -310, 0.5, -200) -- Position frame to the right side of the screen
+frame.AnchorPoint = Vector2.new(1, 0.5) -- Anchor point for positioning
+frame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+frame.Parent = screenGui
+
+-- Create ScrollingFrame
+local scrollingFrame = Instance.new("ScrollingFrame")
+scrollingFrame.Name = "ScrollingFrame"
+scrollingFrame.Size = UDim2.new(1, -20, 0.8, -20)
+scrollingFrame.Position = UDim2.new(0, 10, 0, 10)
+scrollingFrame.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+scrollingFrame.CanvasSize = UDim2.new(0, 0, 2, 0)
+scrollingFrame.ScrollBarThickness = 8
+scrollingFrame.Parent = frame
+
+-- Create UIListLayout for automatic button arrangement
+local uiListLayout = Instance.new("UIListLayout")
+uiListLayout.Parent = scrollingFrame
+uiListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+uiListLayout.Padding = UDim.new(0, 5)
+
+-- Create TextButton template
+local buttonTemplate = Instance.new("TextButton")
+buttonTemplate.Name = "PlayerButton"
+buttonTemplate.Size = UDim2.new(1, -10, 0, 40)
+buttonTemplate.Position = UDim2.new(0, 5, 0, 5)
+buttonTemplate.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+buttonTemplate.TextColor3 = Color3.fromRGB(255, 255, 255)
+buttonTemplate.TextSize = 18
+buttonTemplate.TextXAlignment = Enum.TextXAlignment.Left
+buttonTemplate.Visible = false
+buttonTemplate.Parent = scrollingFrame
+
+-- Create Kill Button
+local killButton = Instance.new("TextButton")
+killButton.Name = "KillButton"
+killButton.Size = UDim2.new(0, 100, 0, 50)
+killButton.Position = UDim2.new(0.5, -50, 1, -60)
+killButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+killButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+killButton.Text = "Kill Players"
+killButton.Parent = frame
+
+-- List of selected players
+local selectedPlayers = {}
+
+-- Function to kill a player
+local function killPlayer(player)
+    local character = player.Character
+    if character then
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            local args = {
+                19742,
+                {humanoid},
+                {
+                    ["DamageHumanoid"] = {
+                        ["Value"] = math.huge, -- Deals infinite damage to humanoids
+                    },
+                    ["DamageVehicle"] = {
+                        ["Value"] = math.huge, -- Deals infinite damage to vehicles
+                    },
+                    ["Explosive"] = {
+                        ["ExplosiveDamageHumanoid"] = {
+                            ["Value"] = math.huge, -- Deals infinite explosive damage to humanoids
+                        },
+                        ["ExplosiveDamageVehicle"] = {
+                            ["Value"] = math.huge, -- Deals infinite explosive damage to vehicles
+                        },
+                    },
+                },
+                Vector3.new(0, 0, 0) -- Vector3 position argument
+            }
+            remote:FireServer(unpack(args))
+        end
+    end
+end
+
+-- Function to create a button for each player
+local function createPlayerButton(player)
+    local button = buttonTemplate:Clone()
+    button.Text = player.Name
+    button.Visible = true
+    button.Parent = scrollingFrame
+
+    button.MouseButton1Click:Connect(function()
+        if not table.find(selectedPlayers, player) then
+            table.insert(selectedPlayers, player)
+            button.BackgroundColor3 = Color3.fromRGB(0, 255, 0) -- Highlight selected player
+        else
+            table.remove(selectedPlayers, table.find(selectedPlayers, player))
+            button.BackgroundColor3 = Color3.fromRGB(100, 100, 100) -- Deselect player
+        end
+    end)
+end
+
+-- Function to refresh the player list
+local function refreshPlayerList()
+    -- Clear existing buttons
+    for _, button in pairs(scrollingFrame:GetChildren()) do
+        if button:IsA("TextButton") and button ~= buttonTemplate then
+            button:Destroy()
+        end
+    end
+
+    -- Recreate player buttons
+    for _, player in pairs(Players:GetPlayers()) do
+        createPlayerButton(player)
+    end
+
+    -- Update CanvasSize to fit all buttons
+    scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, uiListLayout.AbsoluteContentSize.Y)
+end
+
+-- Initial population of player list
+refreshPlayerList()
+
+-- Event handlers for player joining and leaving
+Players.PlayerAdded:Connect(function(player)
+    createPlayerButton(player)
+    -- Update CanvasSize to fit all buttons
+    scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, uiListLayout.AbsoluteContentSize.Y)
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+    for _, button in pairs(scrollingFrame:GetChildren()) do
+        if button:IsA("TextButton") and button.Text == player.Name then
+            button:Destroy()
+        end
+    end
+    -- Update CanvasSize to fit remaining buttons
+    scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, uiListLayout.AbsoluteContentSize.Y)
+end)
+
+-- Configure the "Kill Players" button
+killButton.MouseButton1Click:Connect(function()
+    for _, player in pairs(selectedPlayers) do
+        killPlayer(player)
+    end
+    selectedPlayers = {} -- Clear the list after killing
+    -- Reset button colors
+    for _, button in pairs(scrollingFrame:GetChildren()) do
+        if button:IsA("TextButton") then
+            button.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+        end
+    end
+end)
